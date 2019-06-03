@@ -26,9 +26,9 @@ class siamese:
 
     def network(self, x):
         weights = []
-        fc1 = self.fc_layer(x, 1024, "fc1")
+        fc1 = self.fc_layer(x, 512, "fc1")
         ac1 = tf.nn.relu(fc1)
-        fc2 = self.fc_layer(ac1, 512, "fc2")
+        fc2 = self.fc_layer(ac1, 128, "fc2")
         ac2 = tf.nn.relu(fc2)
         fc3 = self.fc_layer(ac2, 128, "fc3")
         return fc3

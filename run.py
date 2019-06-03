@@ -41,16 +41,7 @@ def create_rand_batch_pairs(x, digit_indices,batch):
         z1, z2 = digit_indices[n][ind1], digit_indices[dn][ind3]
         pairs += [[x[z1], x[z2]]]
         labels += [1, 0]    
-#        for i in range(n):
-#            z1, z2 = digit_indices[d][i], digit_indices[d][i + 1]
-#            pairs += [[x[z1], x[z2]]]
-#            inc = random.randrange(1, num_classes)
-#            dn = (d + inc) % num_classes
-#            z1, z2 = digit_indices[d][i], digit_indices[dn][i]
-#            pairs += [[x[z1], x[z2]]]
-#            labels += [1, 0]
-#        print(d,n,ind1,ind2,dn,ind3)
-#        quit()
+
     return np.array(pairs), np.array(labels)
 
 
@@ -60,6 +51,7 @@ test_x = mnist.test.images
 test_y = mnist.test.labels
 train_x =  mnist.train.images 
 train_y = mnist.train.labels
+
 
 train_digit_indices = [np.where(train_y == i)[0] for i in range(num_classes)]
 train_pairs, train_y = create_rand_batch_pairs(train_x, train_digit_indices,256)
@@ -79,7 +71,8 @@ sess = tf.InteractiveSession()
 
 # setup siamese network
 siamese = inference.siamese()
-train_step = tf.train.GradientDescentOptimizer(0.01).minimize(siamese.loss)
+# train_step = tf.train.GradientDescentOptimizer(0.01).minimize(siamese.loss)
+train_step = tf.train.RMSPropOptimizer(learning_rate=0.01, decay=0.9, epsilon=1e-06).minimize(siamese.loss)
 saver = tf.train.Saver()
 tf.global_variables_initializer().run()
 
@@ -98,7 +91,7 @@ if os.path.isfile(model_ckpt):
 # start training
 
 if new:
-    for step in range(10000):
+    for step in range(50000):
 #        batch_x1, batch_y1 = mnist.train.next_batch(128)
 #        batch_x2, batch_y2 = mnist.train.next_batch(128)
 #        batch_y = (batch_y1 == batch_y2).astype('float')
@@ -123,10 +116,35 @@ if new:
             # print ('step %d: loss %.3f' % (step, loss_v))
             print('step:',step, 'loss:',loss_v)
 
-        if step % 1000 == 0 and step > 0:
+        if (step+1) % 1000 == 0 :
             saver.save(sess, './model/model.ckpt')
             # embed = siamese.o1.eval({siamese.x1: mnist.test.images})
             # embed.tofile('embed.txt')
+                
+            
+            
+            result = []                      
+            for i in range(len(test_x)):
+                test_pairs=[]
+#                if i%1000 == 0:
+#                    print(i)
+                for j in range(num_classes):
+        #            a = x_test[digit_indices[0][0]]
+                    a = test_x[i]
+                    b = test_x[test_digit_indices[j][10]]
+                    test_pairs += [[a,b]]
+                test_pairs = np.array(test_pairs)
+                
+                pre = sess.run(siamese.pre, 
+                                feed_dict={siamese.x1: test_pairs[:,0], siamese.x2: test_pairs[:,1]})
+                
+                result += [pre]
+            result = np.array(result)
+            pre = np.argmin(result,axis=1)
+            acc = np.mean(pre==test_y)
+            print('test accuracy:',acc)
+            
+            
 else:
     saver.restore(sess, './model/model.ckpt')
 
