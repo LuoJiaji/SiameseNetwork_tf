@@ -12,17 +12,25 @@ class siamese:
             scope.reuse_variables()
             self.o2 = self.network(self.x2)
 
+        # print(self.o1.shape)
+
+        self.pre = tf.reduce_sum(tf.pow(tf.subtract(self.o1, self.o2),2),1)
+        self.pre = tf.sqrt(tf.maximum(self.pre,1e-7))
+        # print(pre.shape)
+        # quit()
+
         # Create loss
         self.y_ = tf.placeholder(tf.float32, [None])
-        self.loss = self.loss_with_spring()
+        # self.loss = self.loss_with_spring()
+        self.loss = self.Contrastive_loss()
 
     def network(self, x):
         weights = []
         fc1 = self.fc_layer(x, 1024, "fc1")
         ac1 = tf.nn.relu(fc1)
-        fc2 = self.fc_layer(ac1, 1024, "fc2")
+        fc2 = self.fc_layer(ac1, 512, "fc2")
         ac2 = tf.nn.relu(fc2)
-        fc3 = self.fc_layer(ac2, 2, "fc3")
+        fc3 = self.fc_layer(ac2, 128, "fc3")
         return fc3
 
     def fc_layer(self, bottom, n_weight, name):
@@ -34,6 +42,16 @@ class siamese:
         fc = tf.nn.bias_add(tf.matmul(bottom, W), b)
         return fc
 
+    def Contrastive_loss(self):
+        margin = 1
+        sqaure_pred = tf.pow(self.pre,2)
+        margin_square = tf.pow(tf.maximum(margin-self.pre,0),2)
+        print(margin_square.shape)
+        
+        loss = tf.reduce_mean(self.y_*sqaure_pred + (1-self.y_)*margin_square)
+        print(loss.shape)
+        return loss
+        
     def loss_with_spring(self):
         margin = 5.0
         labels_t = self.y_

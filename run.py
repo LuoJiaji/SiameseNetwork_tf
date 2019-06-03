@@ -10,15 +10,71 @@ from __future__ import print_function
 #import system things
 from tensorflow.examples.tutorials.mnist import input_data # for data
 import tensorflow as tf
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 
 #import helpers
 import inference
 import visualize
+num_classes = 10
+
+def create_rand_batch_pairs(x, digit_indices,batch):
+    '''Positive and negative pair creation.
+    Alternates between positive and negative pairs.
+    '''
+    pairs = []
+    labels = []
+        
+    for d in range(int(batch/2)):
+        n = np.random.randint(10)
+        ind1 = np.random.randint(len(digit_indices[n]))
+        ind2 = np.random.randint(len(digit_indices[n]))
+        z1, z2 = digit_indices[n][ind1], digit_indices[n][ind2]
+        pairs += [[x[z1], x[z2]]]
+        
+        dn = np.random.randint(10)
+        while dn == n:
+            dn = np.random.randint(10)
+            
+        ind3 = np.random.randint(len(digit_indices[dn]))
+        z1, z2 = digit_indices[n][ind1], digit_indices[dn][ind3]
+        pairs += [[x[z1], x[z2]]]
+        labels += [1, 0]    
+#        for i in range(n):
+#            z1, z2 = digit_indices[d][i], digit_indices[d][i + 1]
+#            pairs += [[x[z1], x[z2]]]
+#            inc = random.randrange(1, num_classes)
+#            dn = (d + inc) % num_classes
+#            z1, z2 = digit_indices[d][i], digit_indices[dn][i]
+#            pairs += [[x[z1], x[z2]]]
+#            labels += [1, 0]
+#        print(d,n,ind1,ind2,dn,ind3)
+#        quit()
+    return np.array(pairs), np.array(labels)
+
 
 # prepare data and tf.session
 mnist = input_data.read_data_sets('MNIST_data', one_hot=False)
+test_x = mnist.test.images
+test_y = mnist.test.labels
+train_x =  mnist.train.images 
+train_y = mnist.train.labels
+
+train_digit_indices = [np.where(train_y == i)[0] for i in range(num_classes)]
+train_pairs, train_y = create_rand_batch_pairs(train_x, train_digit_indices,256)
+#plt.subplot(2,2,1)
+#plt.imshow(train_pairs[0,0,:].reshape((28, 28)), cmap='gray')
+#plt.subplot(2,2,2)
+#plt.imshow(train_pairs[0,1,:].reshape((28, 28)), cmap='gray')
+#plt.subplot(2,2,3)
+#plt.imshow(train_pairs[1,0,:].reshape((28, 28)), cmap='gray')
+#plt.subplot(2,2,4)
+#plt.imshow(train_pairs[1,1,:].reshape((28, 28)), cmap='gray')
+#plt.show()
+test_digit_indices = [np.where(test_y == i)[0] for i in range(num_classes)]
+
+
 sess = tf.InteractiveSession()
 
 # setup siamese network
@@ -40,32 +96,41 @@ if os.path.isfile(model_ckpt):
         new = False
 
 # start training
+
 if new:
     for step in range(10000):
-        batch_x1, batch_y1 = mnist.train.next_batch(128)
-        batch_x2, batch_y2 = mnist.train.next_batch(128)
-        batch_y = (batch_y1 == batch_y2).astype('float')
-
+#        batch_x1, batch_y1 = mnist.train.next_batch(128)
+#        batch_x2, batch_y2 = mnist.train.next_batch(128)
+#        batch_y = (batch_y1 == batch_y2).astype('float')
+        
+        train_pairs, train_y = create_rand_batch_pairs(train_x, train_digit_indices,256)
+        batch_x1 = train_pairs[:,0]
+        batch_x2 = train_pairs[:,1]
+        batch_y = train_y.astype('float')
+        
         _, loss_v = sess.run([train_step, siamese.loss], feed_dict={
                             siamese.x1: batch_x1, 
                             siamese.x2: batch_x2, 
                             siamese.y_: batch_y})
+        # pre = sess.run(siamese.pre, feed_dict={siamese.x1: batch_x1, 
+        #                     siamese.x2: batch_x2})
 
         if np.isnan(loss_v):
             print('Model diverged with loss = NaN')
             quit()
 
         if step % 100 == 0:
-            print ('step %d: loss %.3f' % (step, loss_v))
+            # print ('step %d: loss %.3f' % (step, loss_v))
+            print('step:',step, 'loss:',loss_v)
 
         if step % 1000 == 0 and step > 0:
             saver.save(sess, './model/model.ckpt')
-            embed = siamese.o1.eval({siamese.x1: mnist.test.images})
-            embed.tofile('embed.txt')
+            # embed = siamese.o1.eval({siamese.x1: mnist.test.images})
+            # embed.tofile('embed.txt')
 else:
     saver.restore(sess, './model/model.ckpt')
 
 # visualize result
-embed = siamese.o1.eval({siamese.x1: mnist.test.images})
-x_test = mnist.test.images.reshape([-1, 28, 28])
-visualize.visualize(embed, x_test)
+# embed = siamese.o1.eval({siamese.x1: mnist.test.images})
+# x_test = mnist.test.images.reshape([-1, 28, 28])
+# visualize.visualize(embed, x_test)
